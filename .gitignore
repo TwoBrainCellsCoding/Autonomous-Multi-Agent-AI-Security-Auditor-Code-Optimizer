@@ -2,16 +2,40 @@
 multiAgent/
 venv/
 .venv/
+agent-env/
+env/
+ENV/
 
-# Python Cache & Temporary Files
+# Environment Variables & Secrets (CRITICAL)
+.env
+.env.*
+!.env.example
+
+# Python Cache & Bytecode
 __pycache__/
 *.py[cod]
 *$py.class
+*.so
+.pytest_cache/
+.coverage
+htmlcov/
 
-# OS / Editor Files
+# Temporary Clones, Dumps & Temp Files
+agent_audit_*
+repo_audit_*
+*.tmp
+/tmp/
+
+# OS & System Artifacts
+.DS_Store
+Thumbs.db
+
+# IDE & Editor Settings
 .vscode/
 .idea/
-.DS_Store
+*.swp
+*.swo
 
-# Temporary clones / build artifacts
-agent_audit_*
+# Docker / Logs
+*.log
+docker-compose.override.yml
