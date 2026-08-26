@@ -1,0 +1,17 @@
+# Virtual Environments
+multiAgent/
+venv/
+.venv/
+
+# Python Cache & Temporary Files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS / Editor Files
+.vscode/
+.idea/
+.DS_Store
+
+# Temporary clones / build artifacts
+agent_audit_*
