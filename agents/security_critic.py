@@ -1,10 +1,8 @@
 from typing import Dict, Any, List
 
 class SecurityCritic:
-    """
-    Evaluates security audit reports.
-    If CRITICAL or HIGH vulnerabilities exist, it triggers a re-audit loop.
-    """
+    '''Evaluates security audit reports.
+    If CRITICAL or HIGH vulnerabilities exist, it triggers a re-audit loop'''
 
     def __init__(self, max_retries: int = 3):
         self.max_retries = max_retries

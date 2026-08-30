@@ -13,21 +13,17 @@ REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 
 
-# =====================================================================
-# 1. Human Review Request Schema
-# =====================================================================
+#Human Review Request Schema
 class HumanReviewAction(BaseModel):
     audit_id: str = Field(description="Unique ID of the audit session saved in Step 5")
-    action: str = Field(description="'approve' to open a PR, or 'request_changes' to loop back")
+    action: str = Field(description="'review' to inspect details, 'approve' to open PR, or 'request_changes' to loop back")
     feedback_comments: Optional[str] = Field(
         default="", 
         description="Detailed user feedback/instructions if requesting changes"
     )
 
 
-# =====================================================================
-# 2. GitHub Automation Service
-# =====================================================================
+#GitHub Automation Service
 class GitHubPRService:
     def __init__(self, token: Optional[str] = None):
         self.token = token or GITHUB_TOKEN
@@ -86,15 +82,15 @@ class GitHubPRService:
 
         # Open Pull Request
         pr_body = (
-            "## 🤖 Autonomous Multi-Agent AI Audit & Optimizer Report\n\n"
-            "### Summary of Changes\n"
+            "Autonomous Multi-Agent AI Audit & Optimizer Report\n\n"
+            "Summary of Changes\n"
             f"{audit_summary}\n\n"
             "---\n"
-            "*Verified and tested automatically via sandboxed execution.*"
+            "Verified and tested automatically via sandboxed execution.*"
         )
 
         pr = repo.create_pull(
-            title="⚡ [Multi-Agent] Security Hardening & Performance Optimizations",
+            title=" [Multi-Agent] Security Hardening & Performance Optimizations",
             body=pr_body,
             head=branch_name,
             base=default_branch
@@ -107,10 +103,7 @@ class GitHubPRService:
             "branch_created": branch_name
         }
 
-
-# =====================================================================
-# 3. Review Decision Gateway
-# =====================================================================
+#Review Decision Gateway
 def handle_user_review(review: HumanReviewAction, state_data: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """
     Evaluates human input and routes accordingly.
@@ -130,8 +123,20 @@ def handle_user_review(review: HumanReviewAction, state_data: Optional[Dict[str,
     if not session_state:
         raise ValueError(f"No active state found for Audit ID: {review.audit_id}")
 
-    # Branch A: User Requests Changes -> Loop Back with Feedback
-    if review.action == "request_changes":
+    # Branch A: Inspection / Read-only View
+    if review.action == "review":
+        return {
+            "status": "in_review",
+            "audit_id": review.audit_id,
+            "repo_url": session_state.get("repo_url"),
+            "proposed_patches": session_state.get("proposed_patches", []),
+            "security_reports": session_state.get("security_reports", []),
+            "optimizer_reports": session_state.get("optimizer_reports", []),
+            "verifier_summary": session_state.get("verifier_message", "")
+        }
+
+    # Branch B: User Requests Changes -> Loop Back with Feedback
+    elif review.action == "request_changes":
         session_state["human_feedback"] = review.feedback_comments
         session_state["human_gate_status"] = "changes_requested"
         session_state["target_loop_node"] = "optimizer_agent"
@@ -143,7 +148,7 @@ def handle_user_review(review: HumanReviewAction, state_data: Optional[Dict[str,
             "next_node": "optimizer_agent"
         }
 
-    # Branch B: User Approves -> Open GitHub Pull Request
+    # Branch C: User Approves -> Open GitHub Pull Request
     elif review.action == "approve":
         repo_url = session_state.get("repo_url")
         proposed_patches = session_state.get("proposed_patches", [])
@@ -169,4 +174,4 @@ def handle_user_review(review: HumanReviewAction, state_data: Optional[Dict[str,
         }
 
     else:
-        raise ValueError(f"Invalid review action '{review.action}'. Must be 'approve' or 'request_changes'.")
+        raise ValueError(f"Invalid review action '{review.action}'. Must be 'review', 'approve', or 'request_changes'.")

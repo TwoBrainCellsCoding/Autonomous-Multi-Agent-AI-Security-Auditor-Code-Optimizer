@@ -1,39 +1,67 @@
 import os
 from typing import List, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field,  AliasChoices
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_groq import ChatGroq
 
 
-# --- 1. PYDANTIC OUTPUT SCHEMA ---
+#PYDANTIC OUTPUT SCHEMA 
 class OptimizationDetail(BaseModel):
-    area: str = Field(description="Area of code optimized (e.g., algorithmic complexity, caching, async)")
-    issue_description: str = Field(description="Description of the performance bottleneck or inefficiency")
-    time_complexity_before: str = Field(default="N/A", description="Estimated Big-O before optimization")
-    time_complexity_after: str = Field(default="N/A", description="Estimated Big-O after optimization")
-
+    area: str = Field(
+        default="General Optimization",
+        validation_alias=AliasChoices("area", "category", "type"),
+        description="Area of code optimized"
+    )
+    issue_description: str = Field(
+        default="Code refactored for performance",
+        validation_alias=AliasChoices("issue_description", "description", "issue"),
+        description="Description of the performance bottleneck"
+    )
+    time_complexity_before: str = Field(
+        default="N/A",
+        validation_alias=AliasChoices("time_complexity_before", "before"),
+        description="Estimated Big-O before optimization"
+    )
+    time_complexity_after: str = Field(
+        default="N/A",
+        validation_alias=AliasChoices("time_complexity_after", "after"),
+        description="Estimated Big-O after optimization"
+    )
 
 class OptimizerReport(BaseModel):
-    summary: str = Field(description="Summary of refactorings and performance improvements")
-    optimizations: List[OptimizationDetail] = Field(default_factory=list, description="List of optimizations made")
-    patched_code: str = Field(description="Complete refactored and optimized source code for the file")
-
-
-# --- 2. OPTIMIZER SYSTEM PROMPT ---
+    summary: str = Field(
+        default="Performance optimization and code cleanup completed.",  # Ensures validation won't fail if omitted by the model
+        validation_alias=AliasChoices("summary", "explanation", "details", "description"),
+        description="Summary of refactorings made"
+    )
+    optimizations: List[OptimizationDetail] = Field(
+        default_factory=list,
+        validation_alias=AliasChoices("optimizations", "details", "changes"),
+        description="List of optimizations made"
+    )
+    patched_code: str = Field(
+        default="",
+        validation_alias=AliasChoices("patched_code", "optimized_code", "code"),
+        description="Complete refactored source code"
+    )
+#OPTIMIZER SYSTEM PROMPT 
 OPTIMIZER_SYSTEM_PROMPT = """You are a Principal Software Engineer and Performance Optimization Expert.
-Your task is to review source code and refactor it for maximum performance, lower memory usage, and cleaner architecture.
 
-Focus on:
-1. Algorithmic efficiency (reducing O(N^2) to O(N) or O(N log N))
-2. Database query efficiency, batching, and unnecessary I/O
-3. Memory leaks, redundant allocations, and generator/stream usage
-4. Modern idiomatic conventions and readability
+Output your response strictly as a JSON object containing the exact following keys:
+{{
+  "summary": "High-level summary of the refactoring and optimizations applied",
+  "optimizations": [
+    {{
+      "area": "Algorithmic Efficiency",
+      "issue_description": "Reduced redundant passes",
+      "time_complexity_before": "O(N)",
+      "time_complexity_after": "O(N)"
+    }}
+  ],
+  "patched_code": "Complete, fully functional optimized source code string"
+}}
 
-CRITICAL RULE:
-You must return the COMPLETE modified source code in `patched_code`. 
-Do NOT truncate with placeholders like '// rest of code here'. The patched code must be fully runnable and pass tests.
-If no changes are necessary, return the original code inside `patched_code`.
-"""
+CRITICAL RULE: Always include 'summary' and 'patched_code' in the JSON output."""
 
 
 #CORE OPTIMIZER FUNCTION 
@@ -50,7 +78,7 @@ def optimize_single_file(
         temperature=0.1
     )
 
-    structured_llm = llm.with_structured_output(OptimizerReport)
+    structured_llm = llm.with_structured_output(OptimizerReport, method="json_mode")
 
     prompt = ChatPromptTemplate.from_messages([
         ("system", OPTIMIZER_SYSTEM_PROMPT),

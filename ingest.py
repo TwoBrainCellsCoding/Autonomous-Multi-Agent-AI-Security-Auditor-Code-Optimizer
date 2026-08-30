@@ -36,8 +36,6 @@ CODE_EXTENSIONS = {
 
 
 def _process_repository(local_path: str) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-  
-    #Scans the cloned directory from Step 1, extracts code contents, and builds a prioritized task list.
     if not os.path.exists(local_path):
         raise ValueError(f"Local repository path does not exist: {local_path}")
 
@@ -119,7 +117,7 @@ def run_ingestion(
     language: str = "python"
 ) -> Dict[str, Any]:
     
-    #Step 2 ingestion entry point called by Step 1.
+    #ingestion entry point called by Step 1.
     if source_type == "repository":
         if not local_path:
             raise ValueError("Missing 'local_path' for repository source type.")

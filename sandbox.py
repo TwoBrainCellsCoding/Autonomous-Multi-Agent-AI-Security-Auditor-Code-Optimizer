@@ -6,10 +6,6 @@ from typing import Dict, Any, List, Optional
 
 
 class SandboxExecutor:
-    """
-    Step 4: Safely applies proposed code patches to an isolated sandbox 
-    and executes real automated test suites without mutating original files.
-    """
 
     def __init__(self, timeout_seconds: int = 60):
         self.timeout = timeout_seconds
@@ -21,10 +17,6 @@ class SandboxExecutor:
         return sandbox_dir
 
     def _apply_patches(self, sandbox_path: str, patches: List[Dict[str, str]]) -> None:
-        """
-        Applies proposed code modifications to files in the sandbox.
-        patches format: [{"file_path": "app/utils.py", "patched_code": "..."}]
-        """
         for patch in patches:
             rel_path = patch.get("file_path")
             new_code = patch.get("patched_code")
@@ -54,13 +46,6 @@ class SandboxExecutor:
         patches: List[Dict[str, str]],
         custom_test_cmd: Optional[List[str]] = None
     ) -> Dict[str, Any]:
-        """
-        Executes Step 4 Sandbox flow:
-        1. Copies code to isolated temp dir.
-        2. Applies patches.
-        3. Runs tests with strict timeout.
-        4. Cleans up sandbox and returns execution details.
-        """
         if not os.path.exists(original_repo_path):
             raise ValueError(f"Original repo path does not exist: {original_repo_path}")
 
@@ -68,10 +53,10 @@ class SandboxExecutor:
         test_cmd = custom_test_cmd or self._detect_test_command(sandbox_dir)
 
         try:
-            # 1. Apply proposed patches
+            #  Apply proposed patches
             self._apply_patches(sandbox_dir, patches)
 
-            # 2. Execute test command in the isolated workspace
+            #  Execute test command in the isolated workspace
             process = subprocess.run(
                 test_cmd,
                 cwd=sandbox_dir,
@@ -112,13 +97,10 @@ class SandboxExecutor:
                 "error_message": f"Sandbox execution failure: {str(e)}"
             }
         finally:
-            # Always remove the temporary sandbox to prevent disk leaks
             shutil.rmtree(sandbox_dir, ignore_errors=True)
 
 
-# ==========================================
 # LangGraph / Workflow Node Function
-# ==========================================
 def sandbox_testing_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     LangGraph node entrypoint for Step 4.
@@ -139,23 +121,21 @@ def sandbox_testing_node(state: Dict[str, Any]) -> Dict[str, Any]:
     }
 
 
-# ==========================================
 # Direct Test
-# ==========================================
 if __name__ == "__main__":
-    # 1. Create a dummy test repo
+    # Create a dummy test repo
     test_dir = tempfile.mkdtemp(prefix="mock_sandbox_test_")
     sample_file = os.path.join(test_dir, "math_utils.py")
     with open(sample_file, "w") as f:
         f.write("def multiply(a, b):\n    return a * b\n")
 
-    # 2. Mock a patch
+    # Mock a patch
     patches = [{
         "file_path": "math_utils.py",
         "patched_code": "def multiply(a, b):\n    # Optimized\n    return int(a) * int(b)\n"
     }]
 
-    # 3. Run sandbox test
+    # Run sandbox test
     runner = SandboxExecutor()
     result = runner.run_tests(test_dir, patches)
     print("Execution Result:", result)

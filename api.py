@@ -1,10 +1,11 @@
 from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel, HttpUrl
 import uvicorn
-from typing import Optional
-import os
 import tempfile
 from git import Repo
+
+from schemas import AuditRequest
+from main import AutonomousEnginePipeline
+from human_review_pr import HumanReviewAction
 
 app = FastAPI(
     title="Autonomous Security & Refactoring Multi-Agent Engine",
@@ -12,21 +13,8 @@ app = FastAPI(
     version="1.0.0"
 )
 
-# Define request body structure
-class AuditRequest(BaseModel):
-    # Option A: User sends a Git repo URL
-    repo_url: Optional[HttpUrl] = None
-    # Option B: User sends raw code snippet
-    code_snippet: Optional[str] = None
-    # Optional programming language hint
-    language: Optional[str] = "python"
-
-    def validate_input(self):
-        if not self.repo_url and not self.code_snippet:
-            raise ValueError("You must provide either 'repo_url' or 'code_snippet'.")
-        if self.repo_url and self.code_snippet:
-            raise ValueError("Provide 'repo_url' OR 'code_snippet', not both.")
-
+# Initialize Engine Instance
+engine = AutonomousEnginePipeline()
 
 @app.get("/")
 def read_root():
@@ -36,54 +24,54 @@ def read_root():
 @app.post("/api/v1/audit")
 async def audit_code(payload: AuditRequest):
     """
-    Gateway Endpoint: Receives either a Git URL or raw code chunk 
-    and prepares it for the Ingestion / Planner layer.
+    Gateway Endpoint: Clones/Prepares input and triggers the full Multi-Agent pipeline in main.py.
     """
     try:
         payload.validate_input()
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-    # Scenario A: Processing raw code snippet
+    # Scenario A: Code Snippet Execution
     if payload.code_snippet:
-        return {
-            "status": "success",
-            "source_type": "code_snippet",
-            "language": payload.language,
-            "data": payload.code_snippet,
-            "message": "Raw code snippet received successfully. Ready for agent ingestion."
-        }
+        result = engine.run_autonomous_loop(payload)
+        return {"status": "success", "pipeline_result": result}
 
-    # Scenario B: Processing Git repository URL
+    # Scenario B: Git Repository Cloning & Execution
     if payload.repo_url:
         target_url = str(payload.repo_url)
-        # Create a temporary directory to clone the repo into
         temp_dir = tempfile.mkdtemp(prefix="agent_audit_")
         
         try:
-            # Clone the repository
+            # Clone repository to local sandbox
             Repo.clone_from(target_url, temp_dir, depth=1)
             
-            # Count files in cloned directory (quick verification)
-            cloned_files = []
-            for root, _, files in os.walk(temp_dir):
-                if ".git" in root:
-                    continue
-                for file in files:
-                    cloned_files.append(os.path.relpath(os.path.join(root, file), temp_dir))
-
+            # Execute Pipeline on local clone path
+            result = engine.run_autonomous_loop(payload, cloned_local_path=temp_dir)
             return {
                 "status": "success",
-                "source_type": "repository",
                 "repo_url": target_url,
-                "local_path": temp_dir,
-                "file_count": len(cloned_files),
-                "preview_files": cloned_files[:10],  # Show first 10 files
-                "message": "Repository cloned successfully. Ready for Ingestion Node."
+                "pipeline_result": result
             }
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to clone repository: {str(e)}")
+            raise HTTPException(status_code=500, detail=f"Pipeline execution failed: {str(e)}")
+
+
+@app.post("/api/v1/review")
+async def process_review(review: HumanReviewAction):
+    """
+    Human-in-the-loop Gate: Receives 'approve' or 'request_changes' from frontend.
+    Triggers GitHub PR creation on approval or queues feedback loop.
+    """
+    try:
+        review_result = engine.process_human_review(
+            audit_id=review.audit_id,
+            action=review.action,
+            feedback=review.feedback_comments
+        )
+        return {"status": "success", "review_result": review_result}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Human review processing failed: {str(e)}")
 
 
 if __name__ == "__main__":
-    uvicorn.run("api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("api:app", host="127.0.0.1", port=8000, reload=True)
