@@ -15,7 +15,7 @@ Containerization: Docker
 # Setup and Execution Guide
 # 1. Clone the Repository & Setup Environment
 Bash
-git clone https://github.com/TwoBrainCellsCoding/Autonomous-Multi-Agent-AI-Security-Auditor-Code-Optimizer.git
+git clone https://github.com/TwoBrainCellsCoding/Autonomous-Multi-Agent-AI-Security-Auditor-Code-Optimizer.git.
 cd Autonomous-Multi-Agent-AI-Security-Auditor-Code-Optimizer
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
