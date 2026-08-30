@@ -36,12 +36,12 @@ If no changes are necessary, return the original code inside `patched_code`.
 """
 
 
-# --- 3. CORE OPTIMIZER FUNCTION ---
+#CORE OPTIMIZER FUNCTION 
 def optimize_single_file(
     file_path: str,
     code_content: str,
     api_key: str,
-    model_name: str = "llama-3.3-70b-versatile"
+    model_name: str = "openai/gpt-oss-120b"
 ) -> OptimizerReport:
     """Sends code to Groq for performance refactoring."""
     llm = ChatGroq(
@@ -64,7 +64,7 @@ def optimize_single_file(
 def run_optimizer_on_ingestion(
     ingestion_output: Dict[str, Any],
     api_key: str,
-    model_name: str = "llama-3.3-70b-versatile"
+    model_name: str = "openai/gpt-oss-120b"
 ) -> List[Dict[str, Any]]:
     """Runs performance optimization across all code files in the file manifest."""
     file_manifest = ingestion_output.get("file_manifest", [])
