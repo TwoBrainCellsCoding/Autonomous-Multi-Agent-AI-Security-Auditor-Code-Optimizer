@@ -3,7 +3,29 @@ agent-env/
 venv/
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
+.pytest_cache/
 .git/
+.gitignore
 .env
+.env.*
 repo_audit_*
 agent_audit_*
+sandbox_run_*
+mock_repo_*
+mock_sandbox_test_*
+test_pipeline_*
+*.tmp
+/tmp/
+
+# IDE & OS Artifacts
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Documentation & Logs
+*.md
+*.log
+docker-compose.override.yml

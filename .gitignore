@@ -23,6 +23,10 @@ htmlcov/
 # Temporary Clones, Dumps & Temp Files
 agent_audit_*
 repo_audit_*
+sandbox_run_*
+mock_repo_*
+mock_sandbox_test_*
+test_pipeline_*
 *.tmp
 /tmp/
 
