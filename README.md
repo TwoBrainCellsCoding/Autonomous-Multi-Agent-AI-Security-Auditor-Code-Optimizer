@@ -3,25 +3,6 @@ An autonomous, multi-agent AI pipeline designed to ingest code repositories, run
 # # Architecture Diagram
 
 
-# Repository Structure
-Autonomous-Multi-Agent-AI-Security-Auditor-Code-Optimizer/
-│
-├── agents/
-│   ├── __init__.py
-│   ├── security_agent.py       # Red-team vulnerability auditor
-│   └── optimizer_agent.py      # Algorithmic & Big-O performance optimizer
-├── api.py                      # FastAPI endpoints (Ingest & Human Gate)
-├── ingest.py                   # Git cloning and codebase parsing
-├── sandbox.py                  # Ephemeral execution and test runner
-├── verifier.py                 # Self-healing feedback loop analyzer
-├── human_review_pr.py          # Step 6 LangGraph interrupt & PR creator
-├── test_optimizer.py           # Optimizer & sandbox verification test
-├── test_step6.py               # Step 6 Human review gate test
-├── Dockerfile                  # Container build instructions
-├── .dockerignore               # Container build exclusions
-├── .gitignore                  # Git exclusions
-└── requirements.txt            # Python dependencies
-
 # Tech Stack & Dependencies
 LLM Engine & Inference: Groq (llama-3.3-70b-versatile)
 Agent Framework & State: langgraph, langchain-core, langchain-groq, pydantic
