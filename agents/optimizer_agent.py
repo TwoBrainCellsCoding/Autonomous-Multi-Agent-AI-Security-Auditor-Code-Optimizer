@@ -1,183 +1,96 @@
 import os
-import json
-from typing import Dict, List, Any, Optional
+from typing import List, Dict, Any
 from pydantic import BaseModel, Field
-
 from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import JsonOutputParser
-from langchain_openai import ChatOpenAI
+from langchain_groq import ChatGroq
 
 
-# ==========================================
-# 1. Output Schemas
-# ==========================================
-class OptimizationItem(BaseModel):
-    issue_type: str = Field(description="e.g., Algorithmic Complexity, Memory Overhead, Redundant I/O, Clean Code")
-    description: str = Field(description="Detailed explanation of the performance issue or inefficiency")
-    original_snippet: str = Field(description="Targeted snippet from original code")
-    improved_snippet: str = Field(description="Optimized replacement code snippet")
-    performance_gain: str = Field(description="Estimated gain (e.g., O(N^2) to O(N), reduced memory allocations)")
+# --- 1. PYDANTIC OUTPUT SCHEMA ---
+class OptimizationDetail(BaseModel):
+    area: str = Field(description="Area of code optimized (e.g., algorithmic complexity, caching, async)")
+    issue_description: str = Field(description="Description of the performance bottleneck or inefficiency")
+    time_complexity_before: str = Field(default="N/A", description="Estimated Big-O before optimization")
+    time_complexity_after: str = Field(default="N/A", description="Estimated Big-O after optimization")
 
 
-class FileOptimizationReport(BaseModel):
-    file_path: str
-    status: str = Field(description="'optimized', 'no_change_needed', or 'error'")
-    optimizations: List[OptimizationItem] = Field(default_factory=list)
-    refactored_content: str = Field(description="Full source code with all optimizations applied")
+class OptimizerReport(BaseModel):
+    summary: str = Field(description="Summary of refactorings and performance improvements")
+    optimizations: List[OptimizationDetail] = Field(default_factory=list, description="List of optimizations made")
+    patched_code: str = Field(description="Complete refactored and optimized source code for the file")
 
 
-# ==========================================
-# 2. Optimization Agent
-# ==========================================
-class OptimizerAgent:
-    def __init__(self, model_name: str = "gpt-4o", temperature: float = 0.2):
-        self.llm = ChatOpenAI(
-            model=model_name,
-            temperature=temperature,
-            api_key=os.getenv("OPENAI_API_KEY", "")
-        )
-        self.parser = JsonOutputParser(pydantic_object=FileOptimizationReport)
+# --- 2. OPTIMIZER SYSTEM PROMPT ---
+OPTIMIZER_SYSTEM_PROMPT = """You are a Principal Software Engineer and Performance Optimization Expert.
+Your task is to review source code and refactor it for maximum performance, lower memory usage, and cleaner architecture.
 
-        self.prompt = ChatPromptTemplate.from_messages([
-            ("system", (
-                "You are an expert Performance Optimization & Refactoring AI Agent.\n"
-                "Your objective is to analyze source code for performance bottlenecks, algorithmic complexity, "
-                "memory leaks, and anti-patterns, then output an optimized, production-grade refactored version.\n\n"
-                "CRITICAL INSTRUCTIONS:\n"
-                "1. Maintain the exact functionality, public interfaces, and class/function signatures to avoid breaking existing unit tests.\n"
-                "2. If 'verifier_feedback' or 'user_feedback' is present, resolve every mentioned issue directly.\n"
-                "3. You must return ONLY valid JSON matching the schema.\n\n"
-                "{format_instructions}"
-            )),
-            ("user", (
-                "File Path: {file_path}\n"
-                "Language: {language}\n"
-                "Verifier Error/Sandbox Feedback (Step 5): {verifier_feedback}\n"
-                "User Review Feedback (Step 6): {user_feedback}\n\n"
-                "Source Code:\n"
-                "```\n{content}\n```"
-            ))
-        ])
+Focus on:
+1. Algorithmic efficiency (reducing O(N^2) to O(N) or O(N log N))
+2. Database query efficiency, batching, and unnecessary I/O
+3. Memory leaks, redundant allocations, and generator/stream usage
+4. Modern idiomatic conventions and readability
 
-        self.chain = self.prompt | self.llm | self.parser
-
-    def analyze_and_optimize(
-        self,
-        file_path: str,
-        content: str,
-        language: str = "python",
-        verifier_feedback: Optional[str] = None,
-        user_feedback: Optional[str] = None
-    ) -> Dict[str, Any]:
-        """
-        Executes optimization analysis on a single code file.
-        """
-        try:
-            return self.chain.invoke({
-                "file_path": file_path,
-                "language": language,
-                "verifier_feedback": verifier_feedback or "None (Initial Pass)",
-                "user_feedback": user_feedback or "None",
-                "content": content,
-                "format_instructions": self.parser.get_format_instructions()
-            })
-        except Exception as e:
-            return {
-                "file_path": file_path,
-                "status": "error",
-                "error": str(e),
-                "optimizations": [],
-                "refactored_content": content
-            }
+CRITICAL RULE:
+You must return the COMPLETE modified source code in `patched_code`. 
+Do NOT truncate with placeholders like '// rest of code here'. The patched code must be fully runnable and pass tests.
+If no changes are necessary, return the original code inside `patched_code`.
+"""
 
 
-# ==========================================
-# 3. Node Entrypoint for Step 3
-# ==========================================
-def run_optimizer_agent(state: Dict[str, Any]) -> Dict[str, Any]:
-    """
-    Step 3 Optimizer Node:
-    Consumes output from ingest.py (file_manifest & task_list)
-    or loopback feedback from Step 5 Verifier / Step 6 User Gate.
-    """
-    manifest = state.get("file_manifest", [])
-    task_list = state.get("task_list", [])
-    
-    verifier_feedback = state.get("verifier_feedback", {})
-    user_feedback = state.get("user_feedback", {})
+# --- 3. CORE OPTIMIZER FUNCTION ---
+def optimize_single_file(
+    file_path: str,
+    code_content: str,
+    api_key: str,
+    model_name: str = "llama-3.3-70b-versatile"
+) -> OptimizerReport:
+    """Sends code to Groq for performance refactoring."""
+    llm = ChatGroq(
+        model=model_name,
+        groq_api_key=api_key,
+        temperature=0.1
+    )
 
-    agent = OptimizerAgent()
-    optimization_reports: List[Dict[str, Any]] = []
-    
-    # Store or update proposed patches for Step 4 Sandbox tests
-    proposed_patches = state.get("proposed_patches", {})
+    structured_llm = llm.with_structured_output(OptimizerReport)
 
-    # Create content lookup map
-    content_map = {item["path"]: item["content"] for item in manifest}
-    for file_path, patched_code in proposed_patches.items():
-        content_map[file_path] = patched_code
+    prompt = ChatPromptTemplate.from_messages([
+        ("system", OPTIMIZER_SYSTEM_PROMPT),
+        ("user", "File Path: {file_path}\n\nOriginal Code:\n```\n{code_content}\n```")
+    ])
 
-    for task in task_list:
-        file_path = task["file_path"]
-        language = task.get("language", "python")
-        current_code = content_map.get(file_path, "")
+    chain = prompt | structured_llm
+    return chain.invoke({"file_path": file_path, "code_content": code_content})
 
-        if not current_code:
+
+def run_optimizer_on_ingestion(
+    ingestion_output: Dict[str, Any],
+    api_key: str,
+    model_name: str = "llama-3.3-70b-versatile"
+) -> List[Dict[str, Any]]:
+    """Runs performance optimization across all code files in the file manifest."""
+    file_manifest = ingestion_output.get("file_manifest", [])
+    all_optimizer_results = []
+
+    for file_info in file_manifest:
+        if not file_info.get("is_code", False):
             continue
 
-        v_feedback = verifier_feedback.get(file_path)
-        u_feedback = user_feedback.get(file_path)
+        path = file_info.get("path", "unknown")
+        content = file_info.get("content", "")
 
-        report = agent.analyze_and_optimize(
-            file_path=file_path,
-            content=current_code,
-            language=language,
-            verifier_feedback=v_feedback,
-            user_feedback=u_feedback
+        if not content.strip():
+            continue
+
+        report = optimize_single_file(
+            file_path=path,
+            code_content=content,
+            api_key=api_key,
+            model_name=model_name
         )
 
-        optimization_reports.append(report)
+        all_optimizer_results.append({
+            "file_path": path,
+            "report": report.model_dump(),
+            "patched_code": report.patched_code
+        })
 
-        if report.get("status") == "optimized":
-            proposed_patches[file_path] = report.get("refactored_content", current_code)
-            task["status"] = "optimized"
-
-    return {
-        **state,
-        "optimization_reports": optimization_reports,
-        "proposed_patches": proposed_patches,
-        "optimizer_status": "completed"
-    }
-
-
-# ==========================================
-# 4. Standalone Test Execution
-# ==========================================
-if __name__ == "__main__":
-    sample_code = """
-def sum_even_numbers(numbers):
-    total = 0
-    for i in range(len(numbers)):
-        if numbers[i] % 2 == 0:
-            total += numbers[i]
-    return total
-"""
-    mock_state = {
-        "file_manifest": [{
-            "path": "utils.py",
-            "extension": ".py",
-            "lines": 7,
-            "is_code": True,
-            "content": sample_code
-        }],
-        "task_list": [{
-            "file_path": "utils.py",
-            "language": "python",
-            "lines": 7,
-            "status": "pending"
-        }]
-    }
-
-    print("Running Optimizer Agent...")
-    result = run_optimizer_agent(mock_state)
-    print(json.dumps(result["optimization_reports"], indent=2))
+    return all_optimizer_results
