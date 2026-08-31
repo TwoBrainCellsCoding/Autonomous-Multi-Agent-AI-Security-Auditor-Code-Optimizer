@@ -5,16 +5,7 @@ When you give it a GitHub repository, a team of specialized AI agents scans your
 
 ## System Architecture & Workflow
 
-```text
-┌───────────────┐     ┌────────────────┐     ┌──────────────────┐
-│ Ingest Engine ├────►│ Security Agent ├────►│ Security Critic  │
-└───────────────┘     └────────────────┘     └────────┬─────────┘
-                                                      │
-┌───────────────┐     ┌────────────────┐     ┌────────▼─────────┐
-│  GitHub PR    │◄────┤  Human Review  │◄────┤ Optimizer Agent  │
-│  Automation   │     │  Decision Gate │     │   & Verifier     │
-└───────────────┘     └────────────────┘     └──────────────────┘
-```
+![System Architecture](./multiAgent.png)
 
 * **Ingest Phase (`ingest.py`):** Fetches repository code and structures source files into memory.
 * **Security Audit (`agents/security_agent.py` & `agents/security_critic.py`):** Scans code for vulnerability patterns, validates severity ratings, and aggregates security reports using robust Pydantic schemas.
@@ -88,22 +79,13 @@ REDIS_PORT=6379
 ---
 
 ##  Local Development (Without Docker)
-
-1. **Create and activate virtual environment:**
-   ```bash
-   python -m venv venv
-   # On Windows:
-   .\venv\Scripts\activate
-   # On macOS/Linux:
-   source venv/bin/activate
-   ```
-2. **Install dependencies:**
+1. **Install dependencies:**
    ```bash
    pip install -r requirements.txt
    ```
-3. **Run local Redis server:**
+2. **Run local Redis server:**
    Ensure Redis is active on `localhost:6380`
-4. **Start API server:**
+3. **Start API server:**
    ```bash
    python api.py
    ```
